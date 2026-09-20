@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory="web/templates")
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 @app.get("/")
 async def root(request: Request):
-    result = get_sites()
+    result = await asyncio.to_thread(get_sites)
     if result["success"] is True:
         return templates.TemplateResponse(request=request,context={"request": request, "sites": result["result"], "error": None}
                                           ,name="index.html")
@@ -32,7 +32,7 @@ async def add_site(request: Request):
 
 @app.post("/add-site")
 async def add_site_post(request: Request,background_tasks: BackgroundTasks,url: str = Form()):
-    dict_url = get_normalized_url(url)
+    dict_url = await asyncio.to_thread(get_normalized_url, url)
     if dict_url["error"] is not None:
         error_message = dict_url["error"]
         return templates.TemplateResponse(request=request, name="add_site.html",
@@ -43,15 +43,15 @@ async def add_site_post(request: Request,background_tasks: BackgroundTasks,url: 
         return templates.TemplateResponse(request=request, name="add_site.html",
                                           context={"request": request, "error": get_user_message("unsafe_url")})
 
-    all_sites = get_sites()
+    all_sites = await asyncio.to_thread(get_sites)
     if len(all_sites["result"]) >= max_total_scan_links:
         return templates.TemplateResponse(request=request, name="add_site.html",
                                           context={"request": request, "error": get_user_message("total_links_reached")})
-    active_sites = get_sites(only_active=True)
+    active_sites = await asyncio.to_thread(get_sites, True)
     if len(active_sites["result"]) >= max_active_scan_links:
         return templates.TemplateResponse(request=request, name="add_site.html",
                                           context={"request": request, "error": get_user_message("total_active_links_reached")})
-    result = add_site_db(checked_url)
+    result = await asyncio.to_thread(add_site_db, checked_url)
     if result["success"] is True:
         background_tasks.add_task(scan_one_site, checked_url, result["last_id"])
         return RedirectResponse(url=f"/?scanning=1&url={quote(checked_url)}", status_code=303)
@@ -62,7 +62,7 @@ async def add_site_post(request: Request,background_tasks: BackgroundTasks,url: 
 
 @app.get("/site/{site_id}")
 async def site_detail(request: Request, site_id: int):
-    result = get_site_details(site_id)
+    result = await asyncio.to_thread(get_site_details, site_id)
     if result["success"] is True:
         chart_data = list(reversed(result["scans"]))
         return templates.TemplateResponse(request=request,name="site_detail.html",
@@ -73,26 +73,28 @@ async def site_detail(request: Request, site_id: int):
 
 @app.post("/site/{site_id}/delete")
 async def delete_site_route(request: Request, site_id: int):
-    result = delete_site(site_id)
+    result = await asyncio.to_thread(delete_site, site_id)
     if result["success"] is True:
         return RedirectResponse(url="/", status_code=303)
     else:
-        old_result = get_sites()
+        old_result = await asyncio.to_thread(get_sites)
         return templates.TemplateResponse(request=request,name="index.html",context={"request": request,"sites": old_result["result"], "error": get_user_message(result["error"])})
 
 @app.post("/site/{site_id}/toggle")
 async def toggle_site(request: Request, site_id: int):
-    result = toggle_site_active(site_id)
+    result = await asyncio.to_thread(toggle_site_active, site_id)
     if result["success"] is True:
         return RedirectResponse(url="/", status_code=303)
     else:
-        old_result = get_sites()
+        old_result = await asyncio.to_thread(get_sites)
         return templates.TemplateResponse(request=request,name="index.html",context={"request": request,"sites": old_result["result"], "error": get_user_message(result["error"])})
 
 @app.get("/healthz")
 async def health(response: Response):
-    mysql_ok = check_mysql_connection()
-    mongo_ok = check_mongo_connection()
+    mysql_ok, mongo_ok = await asyncio.gather(
+        asyncio.to_thread(check_mysql_connection),
+        asyncio.to_thread(check_mongo_connection)
+    )
     result = {
         "status": "up",
         "components": {
@@ -110,11 +112,11 @@ async def health(response: Response):
 
 @app.post("/site/{site_id}/pin")
 async def pin_site(request: Request, site_id: int):
-    result = toggle_site_pin(site_id)
+    result = await asyncio.to_thread(toggle_site_pin, site_id)
     if result["success"] is True:
         return RedirectResponse(url="/", status_code=303)
     else:
-        old_result = get_sites()
+        old_result = await asyncio.to_thread(get_sites)
         return templates.TemplateResponse(
             request=request, name="index.html",
             context={"request": request, "sites": old_result["result"], "error": get_user_message(result["error"])}

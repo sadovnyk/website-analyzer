@@ -101,6 +101,10 @@ def get_normalized_url(url):
             access["error"] = "invalid_url"
             return access
 
+        if not is_safe_host(parsed.geturl()):
+            access["error"] = "unsafe_url"
+            return access
+
         access["url"] = parsed.geturl()
         return access
 

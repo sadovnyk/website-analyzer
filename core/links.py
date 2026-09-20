@@ -3,9 +3,11 @@ import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from core.config import HEADERS
+from core.security import is_safe_host
 
 MAX_LINKS_TO_CHECK = 200
 MAX_CONCURRENT_LINK_CHECKS = 20
+
 
 async def extract_links(base_url):
     access = {
@@ -15,19 +17,44 @@ async def extract_links(base_url):
     }
     try:
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(base_url) as response:
-                if response.status != 200:
-                    access["status"] = response.status
+
+            current_url = base_url
+            for _ in range(5):
+                if not await asyncio.to_thread(is_safe_host, current_url):
+                    access["error"] = "unsafe_url"
                     return access
-                html = await response.text(errors="ignore")
-                soup = BeautifulSoup(html, 'html.parser')
-                un_links = set()
-                for tag in soup.find_all('a', href=True):
-                    href = str(tag['href']).strip()
-                    un_links.add(href)
-                access["links"] = un_links
-                access["status"] = 200
-                return access
+
+                async with session.get(current_url, allow_redirects=False) as response:
+
+                    if response.status in (301, 302, 303, 307, 308):
+                        current_url = urljoin(current_url, response.headers.get('Location', ''))
+                        continue
+
+                    if response.status != 200:
+                        access["status"] = response.status
+                        return access
+
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'text/html' not in content_type:
+                        access["status"] = 200
+                        access["links"] = set()
+                        return access
+
+                    content_bytes = await response.content.read(5242880)
+                    html = content_bytes.decode('utf-8', errors='ignore')
+
+                    soup = BeautifulSoup(html, 'html.parser')
+                    un_links = set()
+                    for tag in soup.find_all('a', href=True):
+                        href = str(tag['href']).strip()
+                        un_links.add(href)
+
+                    access["links"] = un_links
+                    access["status"] = 200
+                    return access
+
+            access["error"] = "too_many_redirects"
+            return access
 
     except (aiohttp.InvalidURL, ValueError):
         access["error"] = "invalid_url"
@@ -37,6 +64,9 @@ async def extract_links(base_url):
         return access
     except asyncio.TimeoutError:
         access["error"] = "timeout"
+        return access
+    except aiohttp.ClientError:
+        access["error"] = "client_error"
         return access
 
 
@@ -48,14 +78,29 @@ async def check_link(session, url, semaphore):
     }
     async with semaphore:
         try:
-            async with session.head(url, timeout=aiohttp.ClientTimeout(total=3), allow_redirects=True) as response:
-                access["status"] = response.status
-                return access
+            current_url = url
+            for _ in range(3):
+                if not await asyncio.to_thread(is_safe_host, current_url):
+                    access["error"] = "unsafe_url"
+                    return access
+                async with session.head(current_url, timeout=aiohttp.ClientTimeout(total=3), allow_redirects=False) as response:
+                    if response.status in (301, 302, 303, 307, 308):
+                        current_url = urljoin(current_url, response.headers.get('Location', ''))
+                        continue
+
+                    access["status"] = response.status
+                    return access
+
+            access["error"] = "too_many_redirects"
+            return access
         except aiohttp.ClientConnectorError:
             access["error"] = "connection_failed"
             return access
         except asyncio.TimeoutError:
             access["error"] = "timeout"
+            return access
+        except aiohttp.ClientError:
+            access["error"] = "client_error"
             return access
 
 

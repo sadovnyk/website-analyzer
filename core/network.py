@@ -3,7 +3,8 @@ import asyncio
 import time
 from bs4 import BeautifulSoup
 from core.config import HEADERS
-
+from core.security import is_safe_host
+from urllib.parse import urljoin
 
 async def check_status(url):
     access = {
@@ -17,19 +18,42 @@ async def check_status(url):
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.ClientSession(timeout=timeout, headers=HEADERS) as session:
             start = time.time()
-            async with session.get(url) as response:
-                end = time.time()
-                html_content = await response.text(errors="ignore")
-                soup = BeautifulSoup(html_content, 'html.parser')
-                title = soup.title.text.strip() if soup.title else None
-                meta_data = soup.find('meta', attrs={'name': 'description'})
-                meta_description = meta_data['content'] if meta_data else None
-                duration_ms = round((end - start) * 1000)
-                access["title"] = title
-                access["description"] = meta_description
-                access["duration_ms"] = duration_ms
-                access["status_code"] = response.status
-                return access
+
+            current_url = url
+            for _ in range(5):
+                if not await asyncio.to_thread(is_safe_host, current_url):
+                    access["error"] = "unsafe_url"
+                    return access
+
+                async with session.get(current_url, allow_redirects=False) as response:
+                    if response.status in (301, 302, 303, 307, 308):
+                        current_url = urljoin(current_url, response.headers.get('Location', ''))
+                        continue
+
+                    end = time.time()
+                    access["status_code"] = response.status
+                    access["duration_ms"] = round((end - start) * 1000)
+
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'text/html' not in content_type:
+
+                        access["title"] = "Not HTML"
+                        return access
+
+                    content_bytes = await response.content.read(5242880)
+                    html_content = content_bytes.decode('utf-8', errors='ignore')
+
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    title = soup.title.text.strip() if soup.title else None
+                    meta_data = soup.find('meta', attrs={'name': 'description'})
+
+                    access["title"] = title
+                    access["description"] = meta_data['content'] if meta_data else None
+
+                    return access
+
+            access["error"] = "too_many_redirects"
+            return access
 
     except (aiohttp.InvalidURL, ValueError):
         access["error"] = "invalid_url"

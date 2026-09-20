@@ -48,7 +48,9 @@ async def test_extract_links_handles_non_200_status(mock_aiohttp_get):
 async def test_check_link_returns_errors(session, exception_to_raise, expected_error):
     with aioresponses() as mock:
         mock.head("https://www.google.com", exception=exception_to_raise)
-        response = await check_link(session, "https://www.google.com")
+
+        semaphore = asyncio.Semaphore(5)
+        response = await check_link(session, "https://www.google.com", semaphore)
 
         assert response["error"] == expected_error
         assert response["status"] is None
@@ -56,7 +58,8 @@ async def test_check_link_returns_errors(session, exception_to_raise, expected_e
 async def test_check_links_isistance(session):
     with aioresponses() as mock:
         mock.head("https://www.google.com", status=200)
-        results = await check_links(["https://www.google.com"])
+        semaphore = asyncio.Semaphore(5)
+        response = await check_link(session, "https://www.google.com", semaphore)
         assert isinstance(results, list)
         assert len(results) == 1
         assert results[0]["status"] == 200
@@ -112,7 +115,8 @@ async def test_extract_links_handles_non_200_status(mock_aiohttp_get):
 
 async def test_extract_links_success_returns_set_of_hrefs(mock_aiohttp_get):
     mock_aiohttp_get.status = 200
-    mock_aiohttp_get.text = AsyncMock(
+    mock_aiohttp_get.headers = {'Content-Type': 'text/html'}
+    mock_aiohttp_get.content.read = AsyncMock(
         return_value=(
             '<html><body>'
             '<a href="https://www.google.com/a">A</a>'
@@ -131,7 +135,8 @@ async def test_extract_links_success_returns_set_of_hrefs(mock_aiohttp_get):
 
 async def test_extract_links_deduplicates_repeated_hrefs(mock_aiohttp_get):
     mock_aiohttp_get.status = 200
-    mock_aiohttp_get.text = AsyncMock(
+    mock_aiohttp_get.headers = {'Content-Type': 'text/html'}
+    mock_aiohttp_get.content.read = AsyncMock(
         return_value=(
             '<html><body>'
             '<a href="https://www.google.com/a">A</a>'
@@ -147,7 +152,8 @@ async def test_extract_links_deduplicates_repeated_hrefs(mock_aiohttp_get):
 
 async def test_extract_links_no_anchors_returns_empty_set(mock_aiohttp_get):
     mock_aiohttp_get.status = 200
-    mock_aiohttp_get.text = AsyncMock(return_value="<html><body>No links here</body></html>")
+    mock_aiohttp_get.headers = {'Content-Type': 'text/html'}
+    mock_aiohttp_get.content.read = AsyncMock(return_value="<html><body>No links here</body></html>")
 
     result = await extract_links("https://www.google.com")
 
@@ -158,7 +164,8 @@ async def test_extract_links_no_anchors_returns_empty_set(mock_aiohttp_get):
 
 async def test_extract_links_ignores_anchors_without_href(mock_aiohttp_get):
     mock_aiohttp_get.status = 200
-    mock_aiohttp_get.text = AsyncMock(
+    mock_aiohttp_get.headers = {'Content-Type': 'text/html'}
+    mock_aiohttp_get.content.read = AsyncMock(
         return_value='<html><body><a name="anchor">No href</a></body></html>'
     )
 
@@ -169,7 +176,8 @@ async def test_extract_links_ignores_anchors_without_href(mock_aiohttp_get):
 
 async def test_extract_links_strips_whitespace_from_href(mock_aiohttp_get):
     mock_aiohttp_get.status = 200
-    mock_aiohttp_get.text = AsyncMock(
+    mock_aiohttp_get.headers = {'Content-Type': 'text/html'}
+    mock_aiohttp_get.content.read = AsyncMock(
         return_value='<html><body><a href="  https://www.google.com/a  ">A</a></body></html>'
     )
 
@@ -185,7 +193,8 @@ async def test_extract_links_strips_whitespace_from_href(mock_aiohttp_get):
 async def test_check_link_returns_errors(session, exception_to_raise, expected_error):
     with aioresponses() as mock:
         mock.head("https://www.google.com", exception=exception_to_raise)
-        response = await check_link(session, "https://www.google.com")
+        semaphore = asyncio.Semaphore(5)
+        response = await check_link(session, "https://www.google.com", semaphore)
 
         assert response["error"] == expected_error
         assert response["status"] is None
@@ -195,7 +204,8 @@ async def test_check_link_returns_errors(session, exception_to_raise, expected_e
 async def test_check_link_success_returns_200(session):
     with aioresponses() as mock:
         mock.head("https://www.google.com", status=200)
-        response = await check_link(session, "https://www.google.com")
+        semaphore = asyncio.Semaphore(5)
+        response = await check_link(session, "https://www.google.com", semaphore)
 
         assert response["status"] == 200
         assert response["error"] is None
@@ -205,7 +215,8 @@ async def test_check_link_success_returns_200(session):
 async def test_check_link_reports_server_error_status(session):
     with aioresponses() as mock:
         mock.head("https://www.google.com", status=500)
-        response = await check_link(session, "https://www.google.com")
+        semaphore = asyncio.Semaphore(5)
+        response = await check_link(session, "https://www.google.com", semaphore)
 
         assert response["status"] == 500
         assert response["error"] is None

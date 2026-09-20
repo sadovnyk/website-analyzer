@@ -233,9 +233,11 @@ def get_site_details(site_id):
                 "is_active": rows[0]["is_active"],
                 "added_at": rows[0]["added_at"],
             }
+            scan_ids = []
 
             for row in rows:
                 if row["scan_id"] is not None:
+                    scan_ids.append(row["scan_id"])
                     access["scans"].append({
                         "scan_id": row["scan_id"],
                         "status_code": row["status_code"],
@@ -256,26 +258,24 @@ def get_site_details(site_id):
                         "scanned_at": row["scanned_at"],
                         "broken_links": [],
                     })
+            access["success"] = True
 
+        with pymongo.MongoClient(os.environ.get("MONGO_URI")) as client:
+            db = os.environ.get("MONGO_DB")
+            collection = os.environ.get("MONGO_CL")
+            if scan_ids:
+                mongo_results = client[db][collection].find({"my_sql_scan_id": {"$in": scan_ids}})
+                broken_links_map = {doc["my_sql_scan_id"]: doc.get("broken_links", []) for doc in mongo_results}
+            else:
+                broken_links_map = {}
+            for scan in access["scans"]:
+                scan["broken_links"] = broken_links_map.get(scan["scan_id"], [])
     except Exception:
         access["error"] = "db_select_failed"
         return access
     finally:
         if connection:
             connection.close()
-
-    access["success"] = True
-
-    try:
-        with pymongo.MongoClient(os.environ.get("MONGO_URI")) as client:
-            db = os.environ.get("MONGO_DB")
-            collection = os.environ.get("MONGO_CL")
-            for scan in access["scans"]:
-                result = client[db][collection].find_one({"my_sql_scan_id": scan["scan_id"]})
-                if result is not None:
-                    scan["broken_links"] = result["broken_links"]
-    except Exception as e:
-        logger.error(f"Mongo lookup failed while fetching site {site_id} details: {e}")
 
     return access
 
