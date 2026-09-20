@@ -344,9 +344,9 @@ def test_valid_urls_return_success(raw_url, expected_url):
     assert get_normalized_url(raw_url) == {"url": expected_url, "error": None}
 
 
-def test_max_length_boundary_2048_chars():
+def test_max_length_boundary_255_chars():
     base = "https://example.com/"
-    valid_url = base + ("a" * (2048 - len(base)))
+    valid_url = base + ("a" * (255 - len(base)))
 
     assert get_normalized_url(valid_url) == {"url": valid_url, "error": None}
 
@@ -363,7 +363,7 @@ def test_empty_string_returns_empty_url(empty_input):
 
 def test_url_exceeding_max_length_returns_error():
     base = "https://example.com/"
-    too_long_url = base + ("a" * (2049 - len(base)))
+    too_long_url = base + ("a" * (256 - len(base)))
 
     assert get_normalized_url(too_long_url) == {"url": None, "error": "url_too_long"}
 

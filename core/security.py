@@ -57,13 +57,23 @@ def is_safe_host(url):
     return all(_is_public_ip(ip) for ip in ips)
 
 
+def check_host(url):
+    host = urlparse(url).hostname
+    if not host:
+        return "invalid"
+    ips = _resolve_all_ips(host)
+    if not ips:
+        return "unresolved"
+
+    return "ok" if all(_is_public_ip(ip) for ip in ips) else "private"
+
 def get_normalized_url(url):
     access = {
         "url": None,
         "error": None
     }
 
-    max_url_length = 2048
+    max_url_length = 255
     allowed_schemes = {"http", "https"}
 
     if not isinstance(url, str):

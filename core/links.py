@@ -89,6 +89,11 @@ async def check_link(session, url, semaphore):
                         current_url = urljoin(current_url, response.headers.get('Location', ''))
                         continue
 
+                    if response.status in (403, 405, 501):  # server may not support HEAD
+                        async with session.get(current_url, timeout=aiohttp.ClientTimeout(total=5), allow_redirects=False) as get_response:
+                            access["status"] = get_response.status
+                            return access
+
                     access["status"] = response.status
                     return access
 
@@ -136,15 +141,19 @@ async def broken_links(url):
         access["error"] = f"Unable to check links — the page returned status code {result['status']}"
         return access
 
-    absolute_links = [urljoin(url, link) for link in result["links"]]
-    absolute_links = [
-        link for link in absolute_links if urlparse(link).scheme in ("http", "https")
-    ]
-    absolute_links = absolute_links[:MAX_LINKS_TO_CHECK]
+    absolute_links = set()
+    for link in result["links"]:
+        try:
+            absolute = urljoin(url, link)
+            if urlparse(absolute).scheme in ("http", "https"):
+                absolute_links.add(absolute)
+        except ValueError:
+            continue
+    absolute_links = sorted(absolute_links)[:MAX_LINKS_TO_CHECK]
 
     access["total_links"] = len(absolute_links)
     checked_links = await check_links(absolute_links)
     for link in checked_links:
-        if link["error"] is not None or link["status"] is None or link["status"] >= 400:
+        if link["error"] is not None or link["status"] is None or (link["status"] >= 400 and link["status"] != 429):
             access["broken_links"].append(link)
     return access

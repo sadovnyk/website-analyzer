@@ -48,7 +48,7 @@
                         {{ 'Resume monitoring' if not site.is_active else 'Pause monitoring' }}
                     </button>
                 </form>
-                <form action="/site/{{ site.id }}/delete" method="POST">
+                <form action="/site/{{ site.id }}/delete" method="POST" data-turbo-confirm="Delete this site and all its scan history?">
                     <button type="submit" class="btn-detail btn-danger">Delete site</button>
                 </form>
             </div>

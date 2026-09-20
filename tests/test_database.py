@@ -176,21 +176,21 @@ def test_save_links_mongo_error(monkeypatch):
 
 def test_get_sites_returns_mapped_rows(mock_connection, mock_cursor):
     mock_cursor.fetchall.return_value = [
-        (1, "https://a.com", True, True, 200, "A"),
-        (2, "https://b.com", False, False, None, None),
+        (1, "https://a.com", True, True, 200, "A", "2024-01-01"),
+        (2, "https://b.com", False, False, None, None, None),
     ]
     with patch("core.database.get_connection", return_value=mock_connection):
         result = database.get_sites()
 
     assert result["success"] is True
     assert result["result"] == [
-        {"id": 1, "url": "https://a.com", "is_active": True,"is_pinned": True, "status_code": 200, "title": "A", "domain": "a.com"},
-        {"id": 2, "url": "https://b.com", "is_active": False,"is_pinned": False, "status_code": None, "title": None, "domain": "b.com"}
+        {"id": 1, "url": "https://a.com", "is_active": True,"is_pinned": True, "status_code": 200, "title": "A", "added_at": "2024-01-01", "domain": "a.com"},
+        {"id": 2, "url": "https://b.com", "is_active": False,"is_pinned": False, "status_code": None, "title": None, "added_at": None, "domain": "b.com"}
     ]
 
 
 def test_get_sites_handles_null_url(mock_connection, mock_cursor):
-    mock_cursor.fetchall.return_value = [(3, None, True, False, None, None)]
+    mock_cursor.fetchall.return_value = [(3, None, True, False, None, None, None)]
     with patch("core.database.get_connection", return_value=mock_connection):
         result = database.get_sites()
 
@@ -589,7 +589,7 @@ def test_get_sites_includes_is_pinned_field(mock_get_connection):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = [
-        (1, "https://example.com", True, True, 200, "Example"),
+        (1, "https://example.com", True, True, 200, "Example", None),
     ]
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     mock_get_connection.return_value = mock_conn
@@ -607,7 +607,7 @@ def test_get_sites_is_pinned_false_by_default(mock_get_connection):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = [
-        (2, "https://another.com", True, False, 404, "Another"),
+        (2, "https://another.com", True, False, 404, "Another", None),
     ]
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
     mock_get_connection.return_value = mock_conn

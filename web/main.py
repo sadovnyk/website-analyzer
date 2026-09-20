@@ -2,16 +2,24 @@ import asyncio
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request, BackgroundTasks, FastAPI, Form, Response, status
-from core.database import get_sites,add_site_db,get_site_details,delete_site,toggle_site_active,check_mysql_connection,check_mongo_connection, toggle_site_pin
+from core.database import get_sites,add_site_db,get_site_details,delete_site,toggle_site_active,check_mysql_connection,check_mongo_connection, toggle_site_pin, max_active_scan_links
 from core.scan_runner import scan_one_site
 from starlette.responses import RedirectResponse
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from web.errors import get_user_message
 from core.security import get_normalized_url, is_safe_host
 
-max_active_scan_links = 5
 max_total_scan_links = 50
 app = FastAPI()
+
+@app.middleware("http")
+async def block_cross_site_posts(request: Request, call_next):
+    if request.method == "POST":
+        origin = request.headers.get("origin")
+        if origin and urlparse(origin).netloc != request.headers.get("host"):
+            return Response("Cross-site request blocked", status_code=403)
+    return await call_next(request)
+
 templates = Jinja2Templates(directory="web/templates")
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 @app.get("/")
@@ -66,7 +74,8 @@ async def site_detail(request: Request, site_id: int):
     if result["success"] is True:
         chart_data = list(reversed(result["scans"]))
         return templates.TemplateResponse(request=request,name="site_detail.html",
-                                          context={"request": request, "site":result["site"],"scans":result["scans"],"chart_scans": chart_data, "error": None})
+                                          context={"request": request, "site":result["site"],"scans":result["scans"],"chart_scans": chart_data, "error": None,
+                                                   "links_unavailable": result.get("links_unavailable", False)})
     else:
         return templates.TemplateResponse(request=request,name="site_detail.html",
                                           context={"request": request, "site": None, "error": get_user_message(result["error"]),"scans":[],"chart_scans": []})

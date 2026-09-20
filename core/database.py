@@ -28,6 +28,9 @@ def get_connection():
 max_active_scan_links = 5
 MONGO_TIMEOUT_MS = 5000
 
+def _cut(value, limit):
+    return value[:limit] if isinstance(value, str) else value
+
 def save_scan(url,data,site_id, domain=None):
     access = {
         "success": False,
@@ -46,14 +49,14 @@ def save_scan(url,data,site_id, domain=None):
             values = (
                 url,
                 data["status"]["status_code"],
-                data["status"]["title"],
-                data["status"]["description"],
+                _cut(data["status"]["title"], 500),
+                _cut(data["status"]["description"], 500),
                 data["status"]["duration_ms"],
                 data["status"]["error"],
                 data["ip"],
-                data["geo"]["country"],
-                data["geo"]["city"],
-                data["geo"]["org"],
+                _cut(data["geo"]["country"], 250),
+                _cut(data["geo"]["city"], 250),
+                _cut(data["geo"]["org"], 250),
                 data["geo"]["error"],
                 data["cert"]["ssl_days_left"],
                 data["cert"]["valid"],
@@ -117,7 +120,7 @@ def get_sites(only_active = False):
         with connection.cursor() as cursor:
 
             base_query = """
-                         SELECT sts.id, sts.url, sts.is_active,sts.is_pinned, scs.status_code, scs.title
+                         SELECT sts.id, sts.url, sts.is_active,sts.is_pinned, scs.status_code, scs.title, sts.added_at
                          FROM sites sts
                                   LEFT JOIN scans scs ON sts.id = scs.site_id
                              AND scs.id = (SELECT MAX(id) \
@@ -141,6 +144,7 @@ def get_sites(only_active = False):
                     "is_pinned": row[3],
                     "status_code": row[4],
                     "title": row[5],
+                    "added_at": row[6],
                     "domain": clean_domain
                 }
                 access["result"].append(site_dict)
@@ -167,11 +171,14 @@ def add_site_db(url):
             query = ("INSERT INTO sites (url) values (%s)")
             values = (url,)
             cursor.execute(query, values)
-            access["success"] = True
-            access["last_id"] = cursor.lastrowid
+            last_id = cursor.lastrowid
             connection.commit()
+            access["success"] = True
+            access["last_id"] = last_id
+    except pymysql.err.IntegrityError:
+            access["error"] = "site_already_exists"
     except Exception as e:
-        access["error"] = "db_insert_failed"
+            access["error"] = "db_insert_failed"
     finally:
         if connection:
             connection.close()
@@ -296,6 +303,9 @@ def delete_site(site_id):
             values = (site_id,)
             cursor.execute(query, values)
             connection.commit()
+            if cursor.rowcount == 0:
+                access["error"] = "site_not_found"
+                return access
             access["success"] = True
     except Exception:
         access["error"] = "db_delete_failed"

@@ -365,15 +365,18 @@ function showToastError(message) {
         }
     });
 })();
-document.getElementById("add-site-form").addEventListener("submit", function(event) {
-    const urlInput = document.getElementById("url");
-    let value = urlInput.value.trim();
+const addSiteForm = document.getElementById("add-site-form");
+if (addSiteForm) {
+    addSiteForm.addEventListener("submit", function (event) {
+        const urlInput = document.getElementById("url");
+        let value = urlInput.value.trim();
 
-    if (value && !/^https?:\/\//i.test(value)) {
-        value = "https://" + value;
-        urlInput.value = value;
-    }
-});
+        if (value && !/^https?:\/\//i.test(value)) {
+            value = "https://" + value;
+            urlInput.value = value;
+        }
+    });
+}
 (function updateEmptyState(){
     if (window.__updateEmptyState) return;
     window.__updateEmptyState = true;

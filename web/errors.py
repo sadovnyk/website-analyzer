@@ -11,6 +11,7 @@ error_messages = {
     "url_too_long": "The website address is too long.",
     "invalid_scheme": "Invalid website scheme.",
     "unsafe_url": "This website address cannot be scanned.",
+    "site_already_exists": "This website has already been added.",
 }
 
 def get_user_message(error_code):
