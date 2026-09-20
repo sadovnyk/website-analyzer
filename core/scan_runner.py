@@ -13,10 +13,10 @@ async def scan_one_site(url, site_id):
             return
 
         scan_data = await analyze(url)
-        save_result = save_scan(url, scan_data, site_id)
+        save_result = await asyncio.to_thread(save_scan, url, scan_data, site_id)
 
         if save_result["success"] is True:
-            links_result = save_links(save_result["scan_id"], scan_data["links"])
+            links_result = await asyncio.to_thread(save_links, save_result["scan_id"], scan_data["links"])
             if links_result["success"] is not True:
                 logger.error(f"Error (Mongo): {links_result['error']}")
         else:

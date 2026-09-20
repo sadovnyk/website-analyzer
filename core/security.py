@@ -42,14 +42,7 @@ def _is_public_ip(ip_str):
     except ValueError:
         return False
 
-    return not (
-        ip_obj.is_private
-        or ip_obj.is_loopback
-        or ip_obj.is_link_local
-        or ip_obj.is_reserved
-        or ip_obj.is_multicast
-        or ip_obj.is_unspecified
-    )
+    return ip_obj.is_global and not (ip_obj.is_multicast or ip_obj.is_unspecified)
 
 
 def is_safe_host(url):
@@ -152,7 +145,7 @@ def certificate(url):
         return access
     try:
         context = ssl.create_default_context()
-        with socket.create_connection((host, 443)) as sock:
+        with socket.create_connection((host, 443), timeout=10) as sock:
             with context.wrap_socket(sock, server_hostname=host) as sSock:
                 cert = sSock.getpeercert()
                 if not cert:

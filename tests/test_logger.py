@@ -1,5 +1,6 @@
+import importlib
 import logging
-import os
+from unittest.mock import patch
 
 def test_get_logger_returns_logger_with_correct_name(logger_module):
     logger = logger_module.get_logger("test_logger_name")
@@ -50,20 +51,12 @@ def test_get_logger_writes_to_log_file(logger_module, tmp_path):
     assert "test_logger_write" in content
 
 
-def test_log_dir_created_if_missing(tmp_path, monkeypatch):
-    """
-    checking that `os.makedirs(LOG_DIR, exist_ok=True)` runs
-    when the module is imported or reimported, if the directory doesn't exist.
-    """
-    new_log_dir = tmp_path / "nested" / "logs"
-    assert not new_log_dir.exists()
+def test_log_dir_is_created_on_import(logger_module):
+    """Importing the module must create the logs directory if it is missing."""
+    import core.logger as real_module
 
-    monkeypatch.setenv("PYTEST_FAKE", "1")  # no-op
+    with patch("os.makedirs") as mock_makedirs:
+        importlib.reload(real_module)
 
-    import core.logger as logger_module
-    monkeypatch.setattr(logger_module, "LOG_DIR", str(new_log_dir))
-    monkeypatch.setattr(logger_module, "LOG_FILE", str(new_log_dir / "cron.log"))
-
-    os.makedirs(logger_module.LOG_DIR, exist_ok=True)
-
-    assert new_log_dir.exists()
+    mock_makedirs.assert_called_once_with(real_module.LOG_DIR, exist_ok=True)
+    assert real_module.LOG_FILE.endswith("cron.log")

@@ -26,6 +26,7 @@ def get_connection():
     )
 
 max_active_scan_links = 5
+MONGO_TIMEOUT_MS = 5000
 
 def save_scan(url,data,site_id, domain=None):
     access = {
@@ -90,7 +91,7 @@ def save_links(scan_id,links_data):
     }
 
     try:
-        with pymongo.MongoClient(os.environ.get("MONGO_URI")) as client:
+        with pymongo.MongoClient(os.environ.get("MONGO_URI"), serverSelectionTimeoutMS=MONGO_TIMEOUT_MS) as client:
             db = os.environ.get("MONGO_DB")
             collection = os.environ.get("MONGO_CL")
             client[db][collection].insert_one(my_document)
@@ -181,6 +182,7 @@ def get_site_details(site_id):
     access = {
         "success": False,
         "error": None,
+        "links_unavailable": False,
         "site": None,
         "scans": []
     }
@@ -218,7 +220,7 @@ def get_site_details(site_id):
                     ORDER BY scans.id DESC
                     """
             values = (site_id,)
-            cursor.execute(query,values)
+            cursor.execute(query, values)
             rows = cursor.fetchall()
 
             if not rows:
@@ -260,22 +262,24 @@ def get_site_details(site_id):
                     })
             access["success"] = True
 
-        with pymongo.MongoClient(os.environ.get("MONGO_URI")) as client:
-            db = os.environ.get("MONGO_DB")
-            collection = os.environ.get("MONGO_CL")
-            if scan_ids:
-                mongo_results = client[db][collection].find({"my_sql_scan_id": {"$in": scan_ids}})
-                broken_links_map = {doc["my_sql_scan_id"]: doc.get("broken_links", []) for doc in mongo_results}
-            else:
-                broken_links_map = {}
-            for scan in access["scans"]:
-                scan["broken_links"] = broken_links_map.get(scan["scan_id"], [])
     except Exception:
         access["error"] = "db_select_failed"
         return access
     finally:
         if connection:
             connection.close()
+
+    if scan_ids:
+        try:
+            with pymongo.MongoClient(os.environ.get("MONGO_URI"), serverSelectionTimeoutMS=MONGO_TIMEOUT_MS) as client:
+                db = os.environ.get("MONGO_DB")
+                collection = os.environ.get("MONGO_CL")
+                mongo_results = client[db][collection].find({"my_sql_scan_id": {"$in": scan_ids}})
+                broken_links_map = {doc["my_sql_scan_id"]: doc.get("broken_links", []) for doc in mongo_results}
+                for scan in access["scans"]:
+                    scan["broken_links"] = broken_links_map.get(scan["scan_id"], [])
+        except Exception:
+            access["links_unavailable"] = True
 
     return access
 

@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from core.config import HEADERS
 from core.security import is_safe_host
+from core.http_utils import read_limited
 
 MAX_LINKS_TO_CHECK = 200
 MAX_CONCURRENT_LINK_CHECKS = 20
@@ -40,7 +41,7 @@ async def extract_links(base_url):
                         access["links"] = set()
                         return access
 
-                    content_bytes = await response.content.read(5242880)
+                    content_bytes = await read_limited(response)
                     html = content_bytes.decode('utf-8', errors='ignore')
 
                     soup = BeautifulSoup(html, 'html.parser')

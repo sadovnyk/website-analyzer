@@ -21,6 +21,11 @@
             <strong>Something went wrong —</strong> {{ error }}
         </div>
     {% endif %}
+    {% if links_unavailable %}
+        <div class="error-banner" style="background-color: var(--warn-bg, #fff3cd); color: var(--warn-text, #856404); border-color: #ffeeba;">
+            <strong>Warning —</strong> Дані про посилання тимчасово недоступні (не вдалося отримати деталі).
+        </div>
+    {% endif %}
 
     {% if site %}
         {% set latest = scans[0] if scans else None %}
@@ -95,6 +100,9 @@
                     {% if latest.links_error %}
                         <div class="vital-value err">Failed</div>
                         <div class="vital-sub">{{ latest.links_error }}</div>
+                    {% elif links_unavailable %}
+                        <div class="vital-value warn">N/A</div>
+                        <div class="vital-sub">Дані про посилання недоступні</div>
                     {% else %}
                         <div class="vital-value {% if latest.broken_links %}warn{% else %}ok{% endif %}">{{ latest.total_links or 0 }}</div>
                         <div class="vital-sub">{{ latest.broken_links | length }} broken</div>
