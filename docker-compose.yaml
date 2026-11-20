@@ -12,6 +12,7 @@ services:
       - "127.0.0.1:3307:3306"
     volumes:
       - ./mysql_data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
   mongodb:
     image: mongo:latest
     container_name: analyzer-mongodb
@@ -19,12 +20,14 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
+      MONGO_CL: ${MONGO_CL}
     ports:
       - "127.0.0.1:27018:27017"
     volumes:
       - ./mongodb_data:/data/db
+      - ./db/mongo.js:/docker-entrypoint-initdb.d/01-init.js:ro
 
 volumes:
   mysql_data:
   mongodb_data:
-  
