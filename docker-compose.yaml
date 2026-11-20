@@ -42,7 +42,7 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
-      MONGO_URI: mongodb://mongoanalyzer:${MONGO_PASSWORD}@mongodb:27017/
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
       SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-900}
     command: [ "sh", "/app/scripts/run_scheduler.sh" ]
 volumes:
