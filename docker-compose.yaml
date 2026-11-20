@@ -30,6 +30,7 @@ services:
   scheduler:
     build: .
     container_name: analyzer-scheduler
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
     restart: always
     env_file:
       - .env
