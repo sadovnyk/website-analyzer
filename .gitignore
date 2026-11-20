@@ -4,3 +4,5 @@ __pycache__/
 .idea/
 .env
 logs/cron.log
+mysql_data/
+mongodb_data/
