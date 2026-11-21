@@ -49,8 +49,8 @@ docker-compose.yaml  mysql, mongodb and scheduler services
 ## Installation
 
 ```bash
-git clone https://github.com/sadovnyk/website-analyzer-cli.git
-cd website-analyzer-cli
+git clone https://github.com/sadovnyk/website-analyzer.git
+cd website-analyzer
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
