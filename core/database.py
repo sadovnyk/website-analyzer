@@ -152,6 +152,7 @@ def get_sites(only_active = False):
         access["success"] = True
     except Exception as e:
         access["error"] = "db_select_failed"
+        logger.error(f"get_sites failed: {e!r}")
     finally:
         if connection:
             connection.close()

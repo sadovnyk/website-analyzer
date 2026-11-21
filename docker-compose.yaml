@@ -13,6 +13,12 @@ services:
     volumes:
       - ./mysql_data:/var/lib/mysql
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
   mongodb:
     image: mongo:latest
     container_name: analyzer-mongodb
@@ -27,6 +33,12 @@ services:
     volumes:
       - ./mongodb_data:/data/db
       - ./db/mongo.js:/docker-entrypoint-initdb.d/01-init.js:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\")' -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
   scheduler:
     build: .
     container_name: analyzer-scheduler
@@ -36,8 +48,10 @@ services:
       - .env
     working_dir: /app
     depends_on:
-      - mysql
-      - mongodb
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     volumes:
       - ./:/app
     environment:
